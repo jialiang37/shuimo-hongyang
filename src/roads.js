@@ -154,7 +154,7 @@ const toScene = (lon, lat) => ({
 
 async function tryLoadGeoJson() {
   try {
-    const r = await fetch('/assets/data/hongyang.geojson');
+    const r = await fetch('assets/data/hongyang.geojson');
     if (!r.ok) return null;
     const j = await r.json();
     const roads = [];

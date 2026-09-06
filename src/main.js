@@ -135,7 +135,7 @@ function addReveal(mats, start, dur, mode = 'u') {
 
 // ---- 地面：大平面浅色纸面（宣纸纹理平铺，远处被雾融进纸底） ----
 const groundMat = new THREE.MeshBasicMaterial({ color: PAPER_TONE });
-new THREE.TextureLoader().load('/assets/textures/T_Paper.png', (tex) => {
+new THREE.TextureLoader().load('assets/textures/T_Paper.png', (tex) => {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(500, 500); // 8000m / 16m 一格，保持与页面底纹相近的颗粒密度
@@ -181,7 +181,7 @@ function loadJSON(url, tries = 3) {
 
 // ---- 水系：读取实测数据文件构建 ----
 const waterMaterials = [];
-const waterLoad = loadJSON('/assets/data/hongyang-water.json');
+const waterLoad = loadJSON('assets/data/hongyang-water.json');
 waterLoad
   .then((data) => {
     const { group, materials } = buildWater(data);

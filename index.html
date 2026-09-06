@@ -15,7 +15,7 @@
       /* 宣纸铺满页面底层，WebGL 画布透明叠在上面；
         M1 的宣纸纹理是程序化生成的，之后可用 AI 生图的 T_Paper.png 直接替换 */
       body {
-        background: #f2eddf url("/assets/textures/T_Paper.png") repeat;
+        background: #f2eddf url("assets/textures/T_Paper.png") repeat;
         background-size: 512px 512px;
       }
       #scene {
@@ -35,11 +35,21 @@
         user-select: none;
         pointer-events: none;
       }
+      #osm {
+        position: fixed;
+        right: 10px;
+        bottom: 8px;
+        font: 10px/1.4 "Songti SC", "SimSun", serif;
+        color: rgba(138, 127, 104, 0.65);
+        user-select: none;
+        pointer-events: none;
+      }
     </style>
   </head>
   <body>
     <canvas id="scene"></canvas>
     <div id="hint">水墨洪阳 · M7 —— 运镜与入场（点击画面可跳过开场）</div>
+    <div id="osm">地图数据 © OpenStreetMap contributors</div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
