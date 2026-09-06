@@ -87,9 +87,10 @@ export function makeWaterMaterial() {
 // y 抬高到 4m：远离地面（y=0）以避开远距离深度缓冲精度导致的 Z 冲突
 export function ribbonGeometry(points, width, y = 4, closed = false) {
   // 去除相邻过近点：零长度段会让 CatmullRom 切线翻转，条带会捏出"裂口"
+  // 点格式兼容 {x,z} 对象（水系数据）与 [x,z] 数组（街巷数据）
   const pts = [];
   for (const p of points) {
-    const v = new THREE.Vector3(p.x, y, p.z);
+    const v = Array.isArray(p) ? new THREE.Vector3(p[0], y, p[1]) : new THREE.Vector3(p.x, y, p.z);
     const last = pts[pts.length - 1];
     if (!last || last.distanceTo(v) > 0.5) pts.push(v);
   }

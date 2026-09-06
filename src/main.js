@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildWater } from './water.js';
+import { loadStreets, buildRoads } from './roads.js';
 
 // ---- 渲染器（透明底） ----
 const canvas = document.querySelector('#scene');
@@ -86,6 +87,14 @@ fetch('/assets/data/hongyang-water.json')
     waterMaterials.push(...materials);
     scene.add(group);
   });
+
+// ---- 街巷：优先手描 GeoJSON，否则写意格局（洪阳老城十字街） ----
+const roadMaterials = [];
+loadStreets().then((streets) => {
+  const { group, materials } = buildRoads(streets);
+  roadMaterials.push(...materials);
+  scene.add(group);
+});
 
 // ---- 主循环 ----
 const clock = new THREE.Clock();
