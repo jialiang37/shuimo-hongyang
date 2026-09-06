@@ -129,7 +129,7 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength, tile = f
           float dx0 = 0.40, dx1 = 0.60, dy1 = 0.30;
           float inDoor = step(dx0, vUv.x) * step(vUv.x, dx1) * step(0.0, vUv.y) * step(vUv.y, dy1);
           // M11 暮色窗户暖光（窗洞内透出暖黄灯光）
-          col = mix(col, vec3(1.0, 0.78, 0.36), win * uDusk * 0.85);
+          col = mix(col, vec3(1.0, 0.78, 0.36), inWin * uDusk * 0.85);
           col = mix(col, uInk, inDoor * 0.40);
           float mid = (1.0 - smoothstep(0.006, 0.006 + fw.x * 2.0, abs(vUv.x - 0.5))) * inDoor;
           col = mix(col, uWall, mid * 0.5);

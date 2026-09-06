@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildWater } from './water.js';
 import { loadStreets, buildRoads } from './roads.js';
-import { buildBuildings } from './buildings.js';
+import { buildBuildings } from './buildings.js?v=2';
 import { buildLandmarks, LANDMARKS } from './landmarks.js';
 import { buildNature } from './nature.js?v=3';
 import { createAudioController } from './audio.js';

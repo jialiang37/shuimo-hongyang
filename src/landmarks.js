@@ -3,7 +3,7 @@
 // 名牌：楷体 Canvas 贴图 + 朱红印章占位（书法字体素材到位后可替换）
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeBuildingMaterial } from './buildings.js';
+import { makeBuildingMaterial } from './buildings.js?v=2';
 
 // 地标位置与预留半径（x 东，z 南；建筑撒点会避开这些圆）
 export const LANDMARKS = [
