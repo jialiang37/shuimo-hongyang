@@ -1,4 +1,5 @@
 // 草木与点睛（M6）：水墨树撒点 / 飞鸟绕塔 / 远景云雾 / 竖排标题+朱印
+// v2：返回 treeMats/title/clouds 供浮现动画注册
 // 树：Canvas 程序化水墨树三款（用户生图后可放 assets/textures/ 替换），合并几何按款分 3 次 draw call
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -296,5 +297,5 @@ export function buildNature(streets, waterData, landmarks) {
     }
   };
 
-  return { group, update };
+  return { group, update, treeMats, title, clouds };
 }

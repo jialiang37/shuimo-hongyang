@@ -24,6 +24,7 @@ export function makeWaterMaterial() {
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
       uTime: { value: 0 },
       uMode: { value: 0 }, // 0=河道条带(uv.y为米) 1=池塘(uv为径向)
+      uReveal: { value: 1 }, // 晕染浮现阈值 0→1（1=完全显现）
       uInkShallow: { value: new THREE.Color(0xc9c0ab) }, // 淡墨水面
       uInkDeep: { value: new THREE.Color(0x948a74) }, // 浓墨段
       uInkLine: { value: new THREE.Color(0x55503f) }, // 岸线墨线
@@ -44,6 +45,7 @@ export function makeWaterMaterial() {
     fragmentShader: /* glsl */ `
       uniform float uTime;
       uniform float uMode;
+      uniform float uReveal;
       uniform vec3 uInkShallow;
       uniform vec3 uInkDeep;
       uniform vec3 uInkLine;
@@ -52,6 +54,11 @@ export function makeWaterMaterial() {
       #include <fog_pars_fragment>
       ${NOISE_GLSL}
       void main() {
+        // 晕染浮现：fBm 阈值剪裁，阈值边缘洇出湿墨
+        float rn = fbm(vWorld.xz * 0.012);
+        if (rn > uReveal) discard;
+        float wet = 1.0 - smoothstep(uReveal - 0.10, uReveal, rn);
+
         // 沿程坐标：河道用 uv.y（米），池塘用世界坐标
         float along = mix(vUv.y, (vWorld.x + vWorld.z) * 0.7, uMode);
         float across = vUv.x;
@@ -73,6 +80,8 @@ export function makeWaterMaterial() {
 
         // 大块浓淡晕染
         col *= 0.90 + 0.20 * fbm(vec2(along * 0.0025, 3.3));
+        // 浮现边缘的湿墨
+        col = mix(col, uInkLine, wet * 0.5);
 
         gl_FragColor = vec4(col, 1.0);
         #include <fog_fragment>

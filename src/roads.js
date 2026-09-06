@@ -26,13 +26,16 @@ export function makeRoadMaterial() {
       uRoad: { value: new THREE.Color(0xded6c2) }, // 路身（略深于宣纸地面）
       uRoadDeep: { value: new THREE.Color(0xccc2a8) }, // 路身浓墨段
       uInkLine: { value: new THREE.Color(0x5f5947) }, // 边缘墨线
+      uReveal: { value: 1 }, // 晕染浮现阈值 0→1
     }]),
     vertexShader: /* glsl */ `
       varying vec2 vUv;
+      varying vec3 vWorld;
       #include <fog_pars_vertex>
       void main() {
         vUv = uv;
         vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorld = worldPos.xyz;
         vec4 mvPosition = viewMatrix * worldPos;
         gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
@@ -42,10 +45,17 @@ export function makeRoadMaterial() {
       uniform vec3 uRoad;
       uniform vec3 uRoadDeep;
       uniform vec3 uInkLine;
+      uniform float uReveal;
       varying vec2 vUv;
+      varying vec3 vWorld;
       #include <fog_pars_fragment>
       ${NOISE_GLSL}
       void main() {
+        // 晕染浮现剪裁 + 湿墨边缘
+        float rn = fbm(vWorld.xz * 0.012);
+        if (rn > uReveal) discard;
+        float wet = 1.0 - smoothstep(uReveal - 0.10, uReveal, rn);
+
         float along = vUv.y;
         float across = vUv.x;
 
@@ -60,6 +70,9 @@ export function makeRoadMaterial() {
         col = mix(col, uInkLine, halo * 0.16);
         float line = 1.0 - smoothstep(0.025 + jit * 0.5, 0.10 + jit, e);
         col = mix(col, uInkLine, line * 0.65);
+
+        // 浮现边缘的湿墨
+        col = mix(col, uInkLine, wet * 0.4);
 
         gl_FragColor = vec4(col, 1.0);
         #include <fog_fragment>

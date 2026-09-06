@@ -437,11 +437,13 @@ export function buildLandmarks() {
   }
 
   // 名牌
+  const plates = [];
   for (const p of PLATES) {
     const spr = makePlate(p.name, p.y);
     spr.position.set(p.x, p.y, p.z);
     group.add(spr);
+    plates.push(spr);
   }
 
-  return { group, materials };
+  return { group, materials, plates };
 }

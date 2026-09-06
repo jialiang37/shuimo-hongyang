@@ -29,6 +29,7 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength) {
       uWall: { value: new THREE.Color(wallColor) },
       uInk: { value: new THREE.Color(inkColor) },
       uLineK: { value: lineStrength },
+      uReveal: { value: 1 }, // 晕染浮现阈值 0→1
     }]),
     vertexShader: /* glsl */ `
       varying vec2 vUv;
@@ -47,11 +48,17 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength) {
       uniform vec3 uWall;
       uniform vec3 uInk;
       uniform float uLineK;
+      uniform float uReveal;
       varying vec2 vUv;
       varying vec3 vWorld;
       #include <fog_pars_fragment>
       ${NOISE_GLSL}
       void main() {
+        // 晕染浮现剪裁 + 湿墨边缘
+        float rn = fbm(vWorld.xz * 0.012);
+        if (rn > uReveal) discard;
+        float wet = 1.0 - smoothstep(uReveal - 0.10, uReveal, rn);
+
         // 到面边界的距离（Box/屋面每面 UV 0..1）
         float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
         // fBm 笔触抖动：让墨线粗细沿边界自然变化
@@ -63,6 +70,8 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength) {
         col += (fbm(vec2(vWorld.x * 0.05, vWorld.z * 0.05)) - 0.5) * 0.04; // 纸面污渍感
         col = mix(col, uInk, halo * 0.15 * uLineK);
         col = mix(col, uInk, line * uLineK);
+        // 浮现边缘的湿墨
+        col = mix(col, uInk, wet * 0.35);
         gl_FragColor = vec4(col, 1.0);
         #include <fog_fragment>
       }

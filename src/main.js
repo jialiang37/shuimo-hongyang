@@ -8,7 +8,7 @@ import { buildWater } from './water.js';
 import { loadStreets, buildRoads } from './roads.js';
 import { buildBuildings } from './buildings.js';
 import { buildLandmarks, LANDMARKS } from './landmarks.js';
-import { buildNature } from './nature.js';
+import { buildNature } from './nature.js?v=3';
 
 // ---- 渲染器（透明底） ----
 const canvas = document.querySelector('#scene');
@@ -51,20 +51,78 @@ function setView(name = 'ground') {
   }
   controls.update();
 }
-setView(new URLSearchParams(location.search).get('view') || 'ground');
+
+// ---- M7 开场运镜：双样条（机位+注视点）从培风塔推入老城，落到十字街上空 ----
+const INTRO_DUR = 17; // 秒
+const camPath = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(1010, 95, -830),
+  new THREE.Vector3(760, 70, -560),
+  new THREE.Vector3(430, 55, -980),
+  new THREE.Vector3(60, 45, -760),
+  new THREE.Vector3(-380, 30, -430),
+  new THREE.Vector3(-180, 40, -120),
+  new THREE.Vector3(120, 90, 180),
+  new THREE.Vector3(60, 280, 560),
+]);
+const tgtPath = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(820, 20, -700),
+  new THREE.Vector3(430, 0, -880),
+  new THREE.Vector3(60, 0, -700),
+  new THREE.Vector3(-380, 0, -400),
+  new THREE.Vector3(60, 0, -180),
+  new THREE.Vector3(320, 0, -60),
+  new THREE.Vector3(330, 0, -80),
+  new THREE.Vector3(320, 0, -80),
+]);
+const intro = { active: false, t0: 0 };
+function endIntro() {
+  if (!intro.active) return;
+  intro.active = false;
+  controls.enabled = true;
+  camera.position.set(60, 280, 560);
+  controls.target.set(320, 0, -80);
+  controls.update();
+  // 运镜中断/结束时，所有浮现动画直接置为完成
+  for (const rv of revealAnims) {
+    if (rv.mode === 'u') rv.mat.uniforms.uReveal.value = 1;
+    else rv.mat.opacity = 1;
+  }
+}
+
+// 首次加载（URL 无 cam/view/nointro 参数）播放开场运镜
+const urlParams = new URLSearchParams(location.search);
+const playIntro = !urlParams.has('cam') && !urlParams.has('view') && !urlParams.has('nointro');
+if (playIntro) {
+  camera.position.copy(camPath.getPoint(0));
+  controls.target.copy(tgtPath.getPoint(0));
+  controls.enabled = false;
+  camera.lookAt(controls.target);
+  canvas.addEventListener('pointerdown', () => endIntro(), { once: true });
+} else {
+  setView(urlParams.get('view') || 'ground');
+}
 window.__setView = setView; // 浏览器控制台可随时切换
 
-// 支持 ?cam=x,y,z&tgt=x,y,z 直达任意机位（定点验收用），优先于 ?view=
+// 支持 ?cam=x,y,z&tgt=x,y,z 直达任意机位（定点验收用），优先级最高
 {
-  const p = new URLSearchParams(location.search);
-  const cam = p.get('cam');
-  const tgt = p.get('tgt');
+  const cam = urlParams.get('cam');
+  const tgt = urlParams.get('tgt');
   if (cam && tgt) {
     const c = cam.split(',').map(Number);
     const t = tgt.split(',').map(Number);
     camera.position.set(c[0], c[1], c[2]);
     controls.target.set(t[0], t[1], t[2]);
     controls.update();
+  }
+}
+
+// ---- M7 晕染浮现注册表 ----
+const revealAnims = []; // {mat, start, dur, mode}
+function addReveal(mats, start, dur, mode = 'u') {
+  for (const m of mats) {
+    if (mode === 'u') m.uniforms.uReveal.value = 0;
+    else m.opacity = 0;
+    revealAnims.push({ mat: m, start, dur, mode });
   }
 }
 
@@ -150,7 +208,21 @@ loadStreets()
       const nature = buildNature(streets, waterData, LANDMARKS);
       scene.add(nature.group);
       natureUpdates.push(nature.update);
+
+      // ---- M7: 注册分批浮现时间表并启动开场运镜 ----
+      const t0 = clock.getElapsedTime() + 0.2;
+      addReveal(roadMaterials, t0 + 0.8, 2.4, 'u');
+      addReveal(waterMaterials, t0 + 1.8, 3.0, 'u');
+      addReveal(buildingMaterials, t0 + 3.2, 4.5, 'u');
+      addReveal(lm.materials, t0 + 5.0, 3.0, 'u');
+      addReveal(nature.treeMats, t0 + 6.0, 3.5, 'opacity');
+      addReveal(nature.clouds.map((s) => s.material), t0 + 11.0, 2.5, 'opacity');
+      addReveal([nature.title.material], t0 + 13.0, 2.0, 'opacity');
+      addReveal(lm.plates.map((s) => s.material), t0 + 13.5, 2.0, 'opacity');
+      intro.active = true;
+      intro.t0 = t0;
     }).catch((e) => {
+      window.__chainErr = String(e && e.stack ? e.stack.split('\n').slice(0, 4).join(' | ') : e);
       showLoadError('建筑/地标构建失败，请刷新重试');
       console.error(e);
     });
@@ -162,6 +234,7 @@ loadStreets()
 // ---- 主循环 ----
 const clock = new THREE.Clock();
 let loopErrCount = 0;
+let lastTime = 0;
 renderer.setAnimationLoop(() => {
   try {
     // 雾浓度按"期望可视距离"自适应：FogExp2 在距离=V 处雾化因子恰为 e⁻¹，
@@ -171,6 +244,22 @@ renderer.setAnimationLoop(() => {
     const time = clock.getElapsedTime();
     for (const m of waterMaterials) m.uniforms.uTime.value = time;
     for (const u of natureUpdates) u(time);
+    // M7 开场运镜：样条插值机位与注视点，平滑缓动
+    if (intro.active) {
+      const u = Math.min(Math.max((time - intro.t0) / INTRO_DUR, 0), 1);
+      const e = u * u * (3 - 2 * u);
+      camPath.getPoint(e, camera.position);
+      tgtPath.getPoint(e, controls.target);
+      camera.lookAt(controls.target);
+      if (u >= 1) endIntro();
+    }
+    // 分批浮现：按 (time-start)/dur 推进各材质的 uReveal / 透明度
+    for (const rv of revealAnims) {
+      const k = THREE.MathUtils.clamp((time - rv.start) / rv.dur, 0, 1);
+      const v = k * k * (3 - 2 * k);
+      if (rv.mode === 'u') rv.mat.uniforms.uReveal.value = v;
+      else rv.mat.opacity = v;
+    }
     controls.update();
     renderer.render(scene, camera);
   } catch (e) {
