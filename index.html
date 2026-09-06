@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="description" content="水墨普宁 · 洪阳镇中心 —— Three.js 水墨风三维古镇" />
+    <title>水墨洪阳</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #f5f1e6;
+      }
+      #scene {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+      #hint {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%);
+        font: 13px/1.6 "Songti SC", "SimSun", serif;
+        color: #8a7f68;
+        letter-spacing: 0.2em;
+        user-select: none;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="hint">水墨洪阳 · M0 —— 拖动旋转 · 滚轮缩放</div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
