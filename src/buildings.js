@@ -51,6 +51,7 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength, tile = f
       uLineK: { value: lineStrength },
       uReveal: { value: 1 }, // 晕染浮现阈值 0→1
       uTile: { value: tile ? 1 : 0 }, // 1=屋面（画瓦线，无门窗）
+      uDusk: { value: 0 }, // 暮色 0→1（窗户暖光 + 全楼暖染）
       uGrain: { value: getGrainTexture() },
     }]),
     vertexShader: /* glsl */ `
@@ -74,6 +75,7 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength, tile = f
       uniform float uLineK;
       uniform float uReveal;
       uniform float uTile;
+      uniform float uDusk;
       uniform sampler2D uGrain;
       varying vec2 vUv;
       varying vec3 vWorld;
@@ -98,6 +100,8 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength, tile = f
         float grain = texture2D(uGrain, vWorld.xz * 0.09).r;
         col *= 0.90 + grain * 0.14;
 
+        // M11 暮色：全楼暖染
+        col = mix(col, col * vec3(1.08, 0.88, 0.66) + vec3(0.06, 0.02, 0.0), uDusk * 0.45);
         // M10 门窗暗示（仅立面，屋面不画）：格扇窗 + 双扇门，fwidth 抗锯齿
         float verticalFace = 1.0 - step(0.5, abs(vNormalW.y));
         if (uTile < 0.5 && verticalFace > 0.5) {
@@ -122,6 +126,8 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength, tile = f
           // 门：底部中央双扇门 + 中缝亮线 + 门框
           float dx0 = 0.40, dx1 = 0.60, dy1 = 0.30;
           float inDoor = step(dx0, vUv.x) * step(vUv.x, dx1) * step(0.0, vUv.y) * step(vUv.y, dy1);
+          // M11 暮色窗户暖光（窗洞内透出暖黄灯光）
+          col = mix(col, vec3(1.0, 0.78, 0.36), win * uDusk * 0.85);
           col = mix(col, uInk, inDoor * 0.40);
           float mid = (1.0 - smoothstep(0.006, 0.006 + fw.x * 2.0, abs(vUv.x - 0.5))) * inDoor;
           col = mix(col, uWall, mid * 0.5);

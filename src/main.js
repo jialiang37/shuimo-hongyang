@@ -9,6 +9,7 @@ import { loadStreets, buildRoads } from './roads.js';
 import { buildBuildings } from './buildings.js';
 import { buildLandmarks, LANDMARKS } from './landmarks.js';
 import { buildNature } from './nature.js?v=3';
+import { createAudioController } from './audio.js';
 
 // ---- 渲染器（透明底） ----
 const canvas = document.querySelector('#scene');
@@ -25,10 +26,18 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000, 0);
 window.__renderer = renderer; // 验收期临时暴露
 
+// ---- M11 音频与昼夜 ----
+const audio = createAudioController();
+const duskState = { cur: 0, target: 0 };
+
+const duskMats = []; // 需要暮色 uniform 的材质
+
 // ---- 场景与雾 ----
 const scene = new THREE.Scene();
 window.__scene = scene; // 验收期临时暴露
 const PAPER_TONE = 0xf2eddf; // 宣纸纹理平均色（tools/generate-paper-texture.mjs 输出）
+const PAPER_COLOR = new THREE.Color(PAPER_TONE);
+const DUSK_FOG = new THREE.Color(0x8f8296);
 scene.fog = new THREE.FogExp2(PAPER_TONE, 0.0033); // 初始浓度≈贴地可视300m，主循环中按相机距离自适应
 
 // ---- 相机与交互 ----
@@ -121,6 +130,26 @@ window.__setView = setView; // 浏览器控制台可随时切换
     controls.target.set(t[0], t[1], t[2]);
     controls.update();
   }
+}
+
+// ---- M11 按钮：音乐开关 / 日暮切换 ----
+const musicBtn = document.getElementById('music-btn');
+if (musicBtn) {
+  musicBtn.addEventListener('click', () => {
+    audio.ensureStarted();
+    const on = audio.toggleMusic();
+    musicBtn.classList.toggle('active', on);
+  });
+  canvas.addEventListener('pointerdown', () => audio.ensureStarted(), { once: true });
+}
+const duskBtn = document.getElementById('dusk-btn');
+if (duskBtn) {
+  duskBtn.addEventListener('click', () => {
+    duskState.target = duskState.target > 0.5 ? 0 : 1;
+    duskBtn.textContent = duskState.target > 0.5 ? '日' : '暮';
+    const ov = document.getElementById('dusk-tint');
+    if (ov) ov.style.opacity = duskState.target > 0.5 ? 0.42 : 0;
+  });
 }
 
 // ---- M7 晕染浮现注册表 ----
@@ -228,6 +257,7 @@ loadStreets()
       addReveal(nature.clouds.map((s) => s.material), t0 + 11.0, 2.5, 'opacity');
       addReveal([nature.title.material], t0 + 13.0, 2.0, 'opacity');
       addReveal(lm.plates.map((s) => s.material), t0 + 13.5, 2.0, 'opacity');
+      duskMats.push(...buildingMaterials, ...lm.materials.filter((m) => m.uniforms && m.uniforms.uDusk));
       if (playIntro) {
         intro.active = true;
         intro.t0 = t0;
@@ -249,6 +279,7 @@ loadStreets()
 const clock = new THREE.Clock();
 let loopErrCount = 0;
 let lastTime = 0;
+// lastTime 在主循环内更新
 renderer.setAnimationLoop(() => {
   try {
     // 雾浓度按"期望可视距离"自适应：FogExp2 在距离=V 处雾化因子恰为 e⁻¹，
@@ -256,6 +287,13 @@ renderer.setAnimationLoop(() => {
     const dist = camera.position.distanceTo(controls.target);
     scene.fog.density = 1 / Math.max(300, 2.2 * dist);
     const time = clock.getElapsedTime();
+    const dt = Math.min(0.1, time - lastTime);
+    lastTime = time;
+    // M11 暮色平滑过渡
+    duskState.cur += (duskState.target - duskState.cur) * Math.min(1, dt * 2.2);
+    scene.fog.color.copy(PAPER_COLOR).lerp(DUSK_FOG, duskState.cur * 0.55);
+    for (const m of duskMats) if (m.uniforms && m.uniforms.uDusk) m.uniforms.uDusk.value = duskState.cur;
+    audio.setCameraHeight(camera.position.y);
     for (const m of waterMaterials) m.uniforms.uTime.value = time;
     for (const u of natureUpdates) u(time);
     // M7 开场运镜：样条插值机位与注视点，平滑缓动

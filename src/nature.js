@@ -288,6 +288,34 @@ export function buildNature(streets, waterData, landmarks, opts = {}) {
     birds.push(b);
   }
 
+  // ---- M11 英歌舞者：8 人绕戏台行进、随鼓点跳动 ----
+  const YINGGE = { x: 540, z: -150 };
+  const dancers = [];
+  const bodyColors = ['#8f2b22', '#2e2c28', '#b06a2a', '#3e7c4f'];
+  const headColors = [0xf0e8d8, 0x8f2b22, 0x2e2c28, 0xd9b83c];
+  for (let i = 0; i < 8; i++) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.44, 1.5, 8),
+      new THREE.MeshBasicMaterial({ color: bodyColors[i % 4] })
+    );
+    body.position.y = 0.95;
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.38, 10, 8),
+      new THREE.MeshBasicMaterial({ color: headColors[i % 4] })
+    );
+    head.position.y = 2.0;
+    const stick = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6),
+      new THREE.MeshBasicMaterial({ color: 0x5a4632 })
+    );
+    stick.position.set(0.5, 1.35, 0.15);
+    stick.rotation.z = -0.7;
+    g.add(body, head, stick);
+    group.add(g);
+    dancers.push({ g, stick, base: (i / 8) * Math.PI * 2 });
+  }
+
   // ---- 竖排标题 + 朱印 ----
   const title = new THREE.Sprite(new THREE.SpriteMaterial({
     map: titleTexture(), transparent: true, fog: false, depthWrite: false,
@@ -301,6 +329,18 @@ export function buildNature(streets, waterData, landmarks, opts = {}) {
     for (const c of clouds) {
       const a = c.userData.ang + t * 0.0045;
       c.position.set(CENTER.x + Math.cos(a) * c.userData.R, c.userData.y, CENTER.z + Math.sin(a) * c.userData.R);
+    }
+    // 英歌舞者：沿切线行进 + 鼓点跳动 + 挥棒
+    for (let i = 0; i < dancers.length; i++) {
+      const d = dancers[i];
+      const ang = d.base + t * 0.22;
+      d.g.position.set(
+        YINGGE.x + Math.cos(ang) * 16.5,
+        Math.abs(Math.sin(t * 4.6 + i * 0.8)) * 0.16,
+        YINGGE.z + Math.sin(ang) * 16.5
+      );
+      d.g.rotation.y = -ang - Math.PI / 2;
+      d.stick.rotation.z = -0.7 + Math.sin(t * 9.2 + i) * 0.35;
     }
     for (const b of birds) {
       const a = t * b.spd + b.phase;
