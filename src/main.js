@@ -8,6 +8,7 @@ import { buildWater } from './water.js';
 import { loadStreets, buildRoads } from './roads.js';
 import { buildBuildings } from './buildings.js';
 import { buildLandmarks, LANDMARKS } from './landmarks.js';
+import { buildNature } from './nature.js';
 
 // ---- 渲染器（透明底） ----
 const canvas = document.querySelector('#scene');
@@ -80,22 +81,55 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), groundMat);
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
+// ---- 加载健壮性：失败可见 + 自动重试（避免偶发请求失败导致无声白屏） ----
+function showLoadError(msg) {
+  let d = document.getElementById('load-error');
+  if (!d) {
+    d = document.createElement('div');
+    d.id = 'load-error';
+    d.style.cssText =
+      'position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#7e2f24;color:#f6f2e7;padding:8px 18px;font:14px KaiTi,serif;letter-spacing:.12em;z-index:10;border-radius:4px;';
+    document.body.appendChild(d);
+  }
+  d.textContent = '加载失败：' + msg + ' · 正在自动重试，若反复出现请刷新页面';
+}
+function loadJSON(url, tries = 3) {
+  return new Promise((resolve, reject) => {
+    const attempt = (k) => {
+      fetch(url)
+        .then((r) => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(resolve)
+        .catch((e) => {
+          if (k < tries) setTimeout(() => attempt(k + 1), 600 * k);
+          else {
+            showLoadError(url.split('/').pop() + ' 加载失败');
+            reject(e);
+          }
+        });
+    };
+    attempt(1);
+  });
+}
+
 // ---- 水系：读取实测数据文件构建 ----
 const waterMaterials = [];
-const waterLoad = fetch('/assets/data/hongyang-water.json').then((r) => {
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
-});
-waterLoad.then((data) => {
-  const { group, materials } = buildWater(data);
-  waterMaterials.push(...materials);
-  scene.add(group);
-});
+const waterLoad = loadJSON('/assets/data/hongyang-water.json');
+waterLoad
+  .then((data) => {
+    const { group, materials } = buildWater(data);
+    waterMaterials.push(...materials);
+    scene.add(group);
+  })
+  .catch((e) => showLoadError('水系构建失败：' + (e.message || e)));
 
 // ---- 街巷：优先手描 GeoJSON，否则写意格局（洪阳老城十字街） ----
 // ---- 建筑：沿街排布的潮汕民居群（依赖街巷与水系数据做净距检查） ----
 const roadMaterials = [];
 const buildingMaterials = [];
+const natureUpdates = []; // 草木点睛的每帧动画（云漂移/鸟扇翅）
 loadStreets()
   .then((streets) => {
     const { group, materials } = buildRoads(streets);
@@ -111,8 +145,14 @@ loadStreets()
       // ---- 地标六件套 ----
       const lm = buildLandmarks();
       scene.add(lm.group);
+
+      // ---- 草木与点睛：树 / 飞鸟 / 云雾 / 标题 ----
+      const nature = buildNature(streets, waterData, LANDMARKS);
+      scene.add(nature.group);
+      natureUpdates.push(nature.update);
     }).catch((e) => {
-      window.__build = { error: String(e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e) };
+      showLoadError('建筑/地标构建失败，请刷新重试');
+      console.error(e);
     });
   })
   .catch((e) => {
@@ -121,15 +161,24 @@ loadStreets()
 
 // ---- 主循环 ----
 const clock = new THREE.Clock();
+let loopErrCount = 0;
 renderer.setAnimationLoop(() => {
-  // 雾浓度按"期望可视距离"自适应：FogExp2 在距离=V 处雾化因子恰为 e⁻¹，
-  // 故 density = 1/V。贴地 V=300m（浓墨意境）；拉远时 V 随相机距离放大（中景清晰，仅远端入雾）
-  const dist = camera.position.distanceTo(controls.target);
-  scene.fog.density = 1 / Math.max(300, 2.2 * dist);
-  const time = clock.getElapsedTime();
-  for (const m of waterMaterials) m.uniforms.uTime.value = time;
-  controls.update();
-  renderer.render(scene, camera);
+  try {
+    // 雾浓度按"期望可视距离"自适应：FogExp2 在距离=V 处雾化因子恰为 e⁻¹，
+    // 故 density = 1/V。贴地 V=300m（浓墨意境）；拉远时 V 随相机距离放大（中景清晰，仅远端入雾）
+    const dist = camera.position.distanceTo(controls.target);
+    scene.fog.density = 1 / Math.max(300, 2.2 * dist);
+    const time = clock.getElapsedTime();
+    for (const m of waterMaterials) m.uniforms.uTime.value = time;
+    for (const u of natureUpdates) u(time);
+    controls.update();
+    renderer.render(scene, camera);
+  } catch (e) {
+    // 单帧异常不让动画循环静默死亡：记录并继续下一帧
+    loopErrCount++;
+    window.__loopErr = { n: loopErrCount, msg: String(e && e.stack ? e.stack.split('\n').slice(0, 4).join(' | ') : e) };
+    if (loopErrCount <= 3) console.error('渲染循环异常:', e);
+  }
 });
 
 // ---- 窗口自适应 ----
