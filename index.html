@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="description" content="水墨普宁 · 洪阳镇中心 —— Three.js 水墨风三维古镇" />
+    <title>水墨洪阳</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+      /* 宣纸铺满页面底层，WebGL 画布透明叠在上面；
+        M1 的宣纸纹理是程序化生成的，之后可用 AI 生图的 T_Paper.png 直接替换 */
+      body {
+        background: #f2eddf url("assets/textures/T_Paper.png") repeat;
+        background-size: 512px 512px;
+      }
+      #scene {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+      #hint {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%);
+        font: 13px/1.6 "Songti SC", "SimSun", serif;
+        color: #8a7f68;
+        letter-spacing: 0.2em;
+        user-select: none;
+        pointer-events: none;
+      }
+      #osm {
+        position: fixed;
+        right: 10px;
+        bottom: 8px;
+        font: 10px/1.4 "Songti SC", "SimSun", serif;
+        color: rgba(138, 127, 104, 0.65);
+        user-select: none;
+        pointer-events: none;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-ChXxY7rw.js"></script>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="hint">水墨洪阳 · M7 —— 运镜与入场（点击画面可跳过开场）</div>
+    <div id="osm">地图数据 © OpenStreetMap contributors</div>
+  </body>
+</html>
