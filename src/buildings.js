@@ -86,7 +86,7 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength, tile = f
         // 晕染浮现剪裁 + 湿墨边缘
         float rn = fbm(vWorld.xz * 0.012);
         if (rn > uReveal) discard;
-        float wet = 1.0 - smoothstep(uReveal - 0.10, uReveal, rn);
+        float wet = smoothstep(uReveal - 0.08, uReveal - 0.02, rn); // 仅浮现边缘洇墨
 
         // 到面边界的距离（Box/屋面每面 UV 0..1）
         float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
@@ -99,6 +99,8 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength, tile = f
         // M10 宣纸颗粒：世界坐标采样，跨面连续不重缝
         float grain = texture2D(uGrain, vWorld.xz * 0.09).r;
         col *= 0.90 + grain * 0.14;
+        // M10 整体淡墨罩染：保证远中近各距离与纸面都有可读对比（水墨灰调）
+        col = mix(col, uInk, 0.12);
 
         // M11 暮色：全楼暖染
         col = mix(col, col * vec3(1.08, 0.88, 0.66) + vec3(0.06, 0.02, 0.0), uDusk * 0.45);

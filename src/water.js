@@ -58,7 +58,7 @@ export function makeWaterMaterial() {
         // 晕染浮现：fBm 阈值剪裁，阈值边缘洇出湿墨
         float rn = fbm(vWorld.xz * 0.012);
         if (rn > uReveal) discard;
-        float wet = 1.0 - smoothstep(uReveal - 0.10, uReveal, rn);
+        float wet = smoothstep(uReveal - 0.08, uReveal - 0.02, rn); // 仅浮现边缘洇墨
 
         // 沿程坐标：河道用 uv.y（米），池塘用世界坐标
         float along = mix(vUv.y, (vWorld.x + vWorld.z) * 0.7, uMode);

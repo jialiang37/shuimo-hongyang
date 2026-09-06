@@ -35,6 +35,7 @@ const duskMats = []; // 需要暮色 uniform 的材质
 // ---- 场景与雾 ----
 const scene = new THREE.Scene();
 window.__scene = scene; // 验收期临时暴露
+window.__THREE = THREE; // 验收期临时暴露
 const PAPER_TONE = 0xf2eddf; // 宣纸纹理平均色（tools/generate-paper-texture.mjs 输出）
 const PAPER_COLOR = new THREE.Color(PAPER_TONE);
 const DUSK_FOG = new THREE.Color(0x8f8296);
@@ -319,6 +320,14 @@ renderer.setAnimationLoop(() => {
     loopErrCount++;
     window.__loopErr = { n: loopErrCount, msg: String(e && e.stack ? e.stack.split('\n').slice(0, 4).join(' | ') : e) };
     if (loopErrCount <= 3) console.error('渲染循环异常:', e);
+  }
+});
+
+// ---- 后台节流恢复：标签页重新可见时立即补一帧渲染 ----
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    clock.getDelta(); // 吞掉后台期间的时间差
+    renderer.render(scene, camera);
   }
 });
 

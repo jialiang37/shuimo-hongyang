@@ -59,7 +59,7 @@ export function makeRoadMaterial() {
         // 晕染浮现剪裁 + 湿墨边缘
         float rn = fbm(vWorld.xz * 0.012);
         if (rn > uReveal) discard;
-        float wet = 1.0 - smoothstep(uReveal - 0.10, uReveal, rn);
+        float wet = smoothstep(uReveal - 0.08, uReveal - 0.02, rn); // 仅浮现边缘洇墨
 
         float along = vUv.y;
         float across = vUv.x;
