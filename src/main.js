@@ -7,6 +7,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildWater } from './water.js';
 import { loadStreets, buildRoads } from './roads.js';
 import { buildBuildings } from './buildings.js';
+import { buildLandmarks, LANDMARKS } from './landmarks.js';
 
 // ---- 渲染器（透明底） ----
 const canvas = document.querySelector('#scene');
@@ -38,14 +39,14 @@ controls.maxPolarAngle = Math.PI / 2 - 0.02;
 controls.minDistance = 10;
 controls.maxDistance = 2500;
 
-// 视角切换（调试/验收用）：?view=top 斜俯视看水系走向，默认平视沿城内河
+// 视角切换：默认=老城正上空斜俯瞰（地标民居尽收眼底）；?view=top 看水系走向
 function setView(name = 'ground') {
   if (name === 'top') {
     camera.position.set(450, 380, 700);
     controls.target.set(-300, 0, -400);
   } else {
-    camera.position.set(-320, 36, -470);
-    controls.target.set(-500, 0, -1080);
+    camera.position.set(60, 280, 560);
+    controls.target.set(320, 0, -80);
   }
   controls.update();
 }
@@ -102,10 +103,14 @@ loadStreets()
     scene.add(group);
 
     return waterLoad.then((waterData) => {
-      const { group: bg, materials: bm, units } = buildBuildings(streets, waterData);
+      const { group: bg, materials: bm, units } = buildBuildings(streets, waterData, LANDMARKS);
       buildingMaterials.push(...bm);
       scene.add(bg);
       window.__build = { units };
+
+      // ---- 地标六件套 ----
+      const lm = buildLandmarks();
+      scene.add(lm.group);
     }).catch((e) => {
       window.__build = { error: String(e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e) };
     });

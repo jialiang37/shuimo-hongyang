@@ -22,7 +22,8 @@ const NOISE_GLSL = /* glsl */ `
 `;
 
 // 白墙/屋面通用：UV 边缘墨线描边（每面 UV 0..1，靠近边界即墨线+晕）
-function makeBuildingMaterial(wallColor, inkColor, lineStrength) {
+// 导出供地标模块复用
+export function makeBuildingMaterial(wallColor, inkColor, lineStrength) {
   return new THREE.ShaderMaterial({
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
       uWall: { value: new THREE.Color(wallColor) },
@@ -186,9 +187,17 @@ function distToSegments(x, z, segs) {
   return best;
 }
 
-export function buildBuildings(streets, waterData) {
+export function buildBuildings(streets, waterData, exclusions = []) {
   const rand = mulberry32(20261);
   const CENTER = { x: 320, z: -40 }; // 老城中心
+
+  // 地标预留区：建筑不得侵入
+  const inExclusion = (x, z) => {
+    for (const L of exclusions) {
+      if (Math.hypot(x - L.x, z - L.z) < L.r) return true;
+    }
+    return false;
+  };
 
   // 障碍线段：道路中心线（含环城路，按道路等级带半宽）、水系中心线
   const segs = [];
@@ -255,6 +264,7 @@ export function buildBuildings(streets, waterData) {
       if (bad) continue;
       for (const p of ponds) if (Math.hypot(x - p.x, z - p.z) < p.r + 14) { bad = true; break; }
       if (bad) continue;
+      if (inExclusion(x, z)) continue;
       // 原型：老城内多宅院，城外多小屋
       const type = r < 380 ? (rand() < 0.42 ? 'xsh' : rand() < 0.55 ? 'sdj' : 'xw') : 'xw';
       const proto = type === 'xsh' ? prototypeXiashanhu() : type === 'sdj' ? prototypeSidianjin() : prototypeXiaowu();
@@ -306,6 +316,7 @@ export function buildBuildings(streets, waterData) {
         if (bad) continue;
         for (const p of ponds) if (Math.hypot(bx - p.x, bz - p.z) < p.r + 12) { bad = true; break; }
         if (bad) continue;
+        if (inExclusion(bx, bz)) continue;
         const type = type0;
         const proto = type === 'xsh' ? prototypeXiashanhu() : type === 'sdj' ? prototypeSidianjin() : prototypeXiaowu();
         const rot = baseRot + (rand() < 0.5 ? 0 : Math.PI) + (rand() - 0.5) * 0.1;
