@@ -4025,17 +4025,36 @@ void main() {
         float grain = texture2D(uGrain, vWorld.xz * 0.09).r;
         col *= 0.90 + grain * 0.14;
 
-        // M10 门窗暗示（仅立面，屋面不画）
+        // M10 门窗暗示（仅立面，屋面不画）：格扇窗 + 双扇门，fwidth 抗锯齿
         float verticalFace = 1.0 - step(0.5, abs(vNormalW.y));
         if (uTile < 0.5 && verticalFace > 0.5) {
-          // 窗棂：中上位置深色窗洞 + 十字格
-          float win = step(0.32, vUv.x) * step(vUv.x, 0.68) * step(0.40, vUv.y) * step(vUv.y, 0.80);
-          col = mix(col, uInk, win * 0.28);
-          float cross = (smoothstep(0.485, 0.515, vUv.x) + smoothstep(0.585, 0.615, vUv.y)) * win;
-          col = mix(col, uInk, cross * 0.45);
-          // 门：底部中央深色矩形
-          float door = step(0.42, vUv.x) * step(vUv.x, 0.58) * step(vUv.y, 0.30);
-          col = mix(col, uInk, door * 0.38);
+          vec2 fw = vec2(fwidth(vUv.x), fwidth(vUv.y));
+          // 窗洞区域（中上）
+          float wx0 = 0.30, wx1 = 0.70, wy0 = 0.40, wy1 = 0.78;
+          float inWin = step(wx0, vUv.x) * step(vUv.x, wx1) * step(wy0, vUv.y) * step(vUv.y, wy1);
+          // 窗洞内底色：微暗
+          col = mix(col, uInk, inWin * 0.18);
+          // 窗框：四周描边
+          float fx = min(vUv.x - wx0, wx1 - vUv.x);
+          float fy = min(vUv.y - wy0, wy1 - vUv.y);
+          float frame = (1.0 - smoothstep(0.018, 0.018 + fw.x * 2.0, min(fx, fy))) * inWin;
+          col = mix(col, uInk, frame * 0.55);
+          // 格扇：竖向格栅 4 根 + 横向 1 根
+          float gx = abs(fract((vUv.x - wx0) / (wx1 - wx0) * 5.0 + 0.5) - 0.5) * (wx1 - wx0) / 5.0;
+          float latV = (1.0 - smoothstep(0.014, 0.014 + fw.x * 2.0, gx)) * inWin;
+          col = mix(col, uInk, latV * 0.38);
+          float gy = abs(vUv.y - (wy0 + wy1) * 0.5);
+          float latH = (1.0 - smoothstep(0.014, 0.014 + fw.y * 2.0, gy)) * inWin;
+          col = mix(col, uInk, latH * 0.38);
+          // 门：底部中央双扇门 + 中缝亮线 + 门框
+          float dx0 = 0.40, dx1 = 0.60, dy1 = 0.30;
+          float inDoor = step(dx0, vUv.x) * step(vUv.x, dx1) * step(0.0, vUv.y) * step(vUv.y, dy1);
+          col = mix(col, uInk, inDoor * 0.40);
+          float mid = (1.0 - smoothstep(0.006, 0.006 + fw.x * 2.0, abs(vUv.x - 0.5))) * inDoor;
+          col = mix(col, uWall, mid * 0.5);
+          float dfx = min(vUv.x - dx0, dx1 - vUv.x);
+          float dframe = (1.0 - smoothstep(0.012, 0.012 + fw.x * 2.0, min(dfx, dy1 - vUv.y))) * inDoor;
+          col = mix(col, uInk, dframe * 0.5);
         }
 
         // M10 屋顶瓦线：沿坡向等距细线（约 15% 透明度）
