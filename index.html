@@ -35,6 +35,55 @@
         user-select: none;
         pointer-events: none;
       }
+      #dusk-tint {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 1.4s ease;
+        background: linear-gradient(180deg, rgba(96, 66, 88, 0.5), rgba(52, 40, 56, 0.62));
+        z-index: 4;
+      }
+      #music-btn {
+        position: fixed;
+        right: 12px;
+        bottom: 64px;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1.5px solid #8a7f68;
+        background: rgba(246, 242, 231, 0.75);
+        color: #6b6250;
+        font-size: 18px;
+        cursor: pointer;
+        z-index: 6;
+        transition: background 0.3s, color 0.3s;
+      }
+      #music-btn.active {
+        background: #8f2b22;
+        color: #f6f2e7;
+        border-color: #8f2b22;
+      }
+      #dusk-btn {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        padding: 5px 12px;
+        border-radius: 14px;
+        border: 1.5px solid #8a7f68;
+        background: rgba(246, 242, 231, 0.75);
+        color: #6b6250;
+        font: 13px "KaiTi", "SimSun", serif;
+        letter-spacing: 0.2em;
+        cursor: pointer;
+        z-index: 6;
+        transition: background 0.3s, color 0.3s;
+      }
+      #dusk-btn.active {
+        background: #43364a;
+        color: #f6f2e7;
+        border-color: #43364a;
+      }
       #osm {
         position: fixed;
         right: 10px;
@@ -45,11 +94,14 @@
         pointer-events: none;
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-l2ZM_Abm.js"></script>
+    <script type="module" crossorigin src="./assets/index-BBVvL3Qp.js"></script>
   </head>
   <body>
     <canvas id="scene"></canvas>
-    <div id="hint">水墨洪阳 · M7 —— 运镜与入场（点击画面可跳过开场）</div>
+    <div id="dusk-tint"></div>
+    <button id="dusk-btn" title="切换日暮">暮</button>
+    <button id="music-btn" title="背景音乐开关">♪</button>
+    <div id="hint">水墨洪阳 · M11 —— 氛围与动效</div>
     <div id="osm">地图数据 © OpenStreetMap contributors</div>
   </body>
 </html>
