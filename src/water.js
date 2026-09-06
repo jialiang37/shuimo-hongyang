@@ -1,6 +1,7 @@
 // 水墨水系：河道条带 / 池塘圆面 + 自定义水面着色器
 // 效果构成：淡墨→浓墨的沿程墨韵、时间流动的微波纹、噪声抖动的浓墨岸线（笔触感）
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const NOISE_GLSL = /* glsl */ `
   float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -142,24 +143,22 @@ export function ribbonGeometry(points, width, y = 4, closed = false) {
 // 从 hongyang-water.json 构建整片水系（河道 + 护城河 + 池塘）
 export function buildWater(data) {
   const group = new THREE.Group();
-  const materials = [];
-  for (const r of data.rivers) {
-    const mat = makeWaterMaterial();
-    materials.push(mat);
-    const mesh = new THREE.Mesh(ribbonGeometry(r.points, r.width, 4, r.closed === true), mat);
-    mesh.renderOrder = 1;
-    group.add(mesh);
-  }
+  // 河道（uMode 0）与池塘（uMode 1）各合并为一个 Mesh，共 2 次 draw call
+  const ribbonMat = makeWaterMaterial();
+  const pondMat = makeWaterMaterial();
+  pondMat.uniforms.uMode.value = 1;
+  const ribbons = [];
+  for (const r of data.rivers) ribbons.push(ribbonGeometry(r.points, r.width, 4, r.closed === true));
+  const ponds = [];
   for (const p of data.ponds) {
-    const mat = makeWaterMaterial();
-    mat.uniforms.uMode.value = 1;
-    materials.push(mat);
-    const geo = new THREE.CircleGeometry(p.r, 56);
-    geo.rotateX(-Math.PI / 2);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(p.x, 3.5, p.z);
-    mesh.renderOrder = 1;
-    group.add(mesh);
+    const g = new THREE.CircleGeometry(p.r, 56).rotateX(-Math.PI / 2);
+    g.translate(p.x, 3.5, p.z);
+    ponds.push(g);
   }
-  return { group, materials };
+  const rm = new THREE.Mesh(mergeGeometries(ribbons), ribbonMat);
+  rm.renderOrder = 1;
+  const pm = new THREE.Mesh(mergeGeometries(ponds), pondMat);
+  pm.renderOrder = 1;
+  group.add(rm, pm);
+  return { group, materials: [ribbonMat, pondMat] };
 }

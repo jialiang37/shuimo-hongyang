@@ -118,7 +118,7 @@ function titleTexture() {
   return tex;
 }
 
-export function buildNature(streets, waterData, landmarks) {
+export function buildNature(streets, waterData, landmarks, opts = {}) {
   const rand = mulberry32(4261);
   const group = new THREE.Group();
   const CENTER = { x: 320, z: -40 };
@@ -128,6 +128,7 @@ export function buildNature(streets, waterData, landmarks) {
   const texs = [treeTexture(11, 0), treeTexture(22, 1), treeTexture(33, 2)];
   const geos = [[], [], []];
   const plant = (x, z, s = 1) => {
+    if (opts.mobile && rand() < 0.5) return; // 移动端树减半
     const vi = Math.floor(rand() * 3);
     const g = new THREE.PlaneGeometry(15 * s, 19 * s);
     g.rotateY(rand() * Math.PI * 2);

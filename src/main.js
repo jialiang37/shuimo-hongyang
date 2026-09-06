@@ -12,8 +12,15 @@ import { buildNature } from './nature.js?v=3';
 
 // ---- 渲染器（透明底） ----
 const canvas = document.querySelector('#scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// 移动端降级：粗指针/小屏视为手机或平板——关闭抗锯齿、限制像素比
+const IS_MOBILE = window.matchMedia('(pointer: coarse)').matches || Math.min(window.innerWidth, window.innerHeight) < 500;
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: !IS_MOBILE,
+  alpha: true,
+  powerPreference: 'high-performance',
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000, 0);
 window.__renderer = renderer; // 验收期临时暴露
@@ -205,7 +212,7 @@ loadStreets()
       scene.add(lm.group);
 
       // ---- 草木与点睛：树 / 飞鸟 / 云雾 / 标题 ----
-      const nature = buildNature(streets, waterData, LANDMARKS);
+      const nature = buildNature(streets, waterData, LANDMARKS, { mobile: IS_MOBILE });
       scene.add(nature.group);
       natureUpdates.push(nature.update);
 

@@ -2,6 +2,7 @@
 // 数据优先读 public/assets/data/hongyang.geojson（手描路网），
 // 不存在时使用内置写意格局（参考洪阳老城十字街：一横一纵穿城，街巷在城内有机生长）。
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ribbonGeometry } from './water.js';
 
 const NOISE_GLSL = /* glsl */ `
@@ -179,19 +180,17 @@ export async function loadStreets() {
 
 export function buildRoads(streets) {
   const group = new THREE.Group();
-  const materials = [];
-  const addRibbon = (pts, width, y, closed = false) => {
-    const mat = makeRoadMaterial();
-    materials.push(mat);
-    const mesh = new THREE.Mesh(ribbonGeometry(pts, width, y, closed), mat);
-    mesh.renderOrder = 1;
-    group.add(mesh);
-  };
+  const mat = makeRoadMaterial();
+  // 全部路网合并为单一几何体（1 次 draw call）；高度差已烘焙进顶点
+  const geos = [];
   for (const r of streets.roads) {
     // 主干道与街巷分层高度，交叉处上层自然盖住下层，避免同高闪面
-    addRibbon(r.pts, r.width, r.cls === 'main' ? 2.8 : 2.5, r.closed === true);
+    geos.push(ribbonGeometry(r.pts, r.width, r.cls === 'main' ? 2.8 : 2.5, r.closed === true));
   }
   // 四门石桥：略高于水面（4），跨接护城河两岸
-  for (const b of streets.bridges || []) addRibbon(b.pts, 18, 4.6);
-  return { group, materials };
+  for (const b of streets.bridges || []) geos.push(ribbonGeometry(b.pts, 18, 4.6));
+  const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
+  mesh.renderOrder = 1;
+  group.add(mesh);
+  return { group, materials: [mat] };
 }
