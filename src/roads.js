@@ -30,11 +30,14 @@ export function makeRoadMaterial() {
       uReveal: { value: 1 }, // 晕染浮现阈值 0→1
     }]),
     vertexShader: /* glsl */ `
+      attribute float aMain;
       varying vec2 vUv;
       varying vec3 vWorld;
+      varying float vMain;
       #include <fog_pars_vertex>
       void main() {
         vUv = uv;
+        vMain = aMain;
         vec4 worldPos = modelMatrix * vec4(position, 1.0);
         vWorld = worldPos.xyz;
         vec4 mvPosition = viewMatrix * worldPos;
@@ -49,6 +52,7 @@ export function makeRoadMaterial() {
       uniform float uReveal;
       varying vec2 vUv;
       varying vec3 vWorld;
+      varying float vMain;
       #include <fog_pars_fragment>
       ${NOISE_GLSL}
       void main() {
@@ -74,6 +78,11 @@ export function makeRoadMaterial() {
 
         // 浮现边缘的湿墨
         col = mix(col, uInkLine, wet * 0.4);
+
+        // M10 主干道中线虚线（极淡笔触，沿程每约 8 米一段）
+        float dash = step(0.5, fract(vUv.y * 0.12));
+        float centerline = 1.0 - smoothstep(0.02, 0.05, abs(vUv.x - 0.5));
+        col = mix(col, uInkLine, centerline * dash * vMain * 0.22);
 
         gl_FragColor = vec4(col, 1.0);
         #include <fog_fragment>
@@ -185,10 +194,10 @@ export function buildRoads(streets) {
   const geos = [];
   for (const r of streets.roads) {
     // 主干道与街巷分层高度，交叉处上层自然盖住下层，避免同高闪面
-    geos.push(ribbonGeometry(r.pts, r.width, r.cls === 'main' ? 2.8 : 2.5, r.closed === true));
+    geos.push(ribbonGeometry(r.pts, r.width, r.cls === 'main' ? 2.8 : 2.5, r.closed === true, r.cls === 'main'));
   }
-  // 四门石桥：略高于水面（4），跨接护城河两岸
-  for (const b of streets.bridges || []) geos.push(ribbonGeometry(b.pts, 18, 4.6));
+  // 四门石桥：略高于水面（4），跨接护城河两岸（桥面延续主干道中线虚线）
+  for (const b of streets.bridges || []) geos.push(ribbonGeometry(b.pts, 18, 4.6, false, true));
   const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
   mesh.renderOrder = 1;
   group.add(mesh);

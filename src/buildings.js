@@ -23,20 +23,44 @@ const NOISE_GLSL = /* glsl */ `
 
 // 白墙/屋面通用：UV 边缘墨线描边（每面 UV 0..1，靠近边界即墨线+晕）
 // 导出供地标模块复用
-export function makeBuildingMaterial(wallColor, inkColor, lineStrength) {
+// M10：+宣纸颗粒纹理（世界坐标采样，跨面连续）+门窗暗示（立面）+瓦线（屋顶 uTile=1）
+let grainTexCache = null;
+function getGrainTexture() {
+  if (grainTexCache) return grainTexCache;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(128, 128);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 225 + Math.random() * 30; // 高亮低对比噪声
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  grainTexCache = new THREE.CanvasTexture(c);
+  grainTexCache.wrapS = grainTexCache.wrapT = THREE.RepeatWrapping;
+  grainTexCache.colorSpace = THREE.SRGBColorSpace;
+  return grainTexCache;
+}
+
+export function makeBuildingMaterial(wallColor, inkColor, lineStrength, tile = false) {
   return new THREE.ShaderMaterial({
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
       uWall: { value: new THREE.Color(wallColor) },
       uInk: { value: new THREE.Color(inkColor) },
       uLineK: { value: lineStrength },
       uReveal: { value: 1 }, // 晕染浮现阈值 0→1
+      uTile: { value: tile ? 1 : 0 }, // 1=屋面（画瓦线，无门窗）
+      uGrain: { value: getGrainTexture() },
     }]),
     vertexShader: /* glsl */ `
       varying vec2 vUv;
       varying vec3 vWorld;
+      varying vec3 vNormalW;
       #include <fog_pars_vertex>
       void main() {
         vUv = uv;
+        vNormalW = normalize(mat3(modelMatrix) * normal);
         vec4 worldPos = modelMatrix * vec4(position, 1.0);
         vWorld = worldPos.xyz;
         vec4 mvPosition = viewMatrix * worldPos;
@@ -49,8 +73,11 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength) {
       uniform vec3 uInk;
       uniform float uLineK;
       uniform float uReveal;
+      uniform float uTile;
+      uniform sampler2D uGrain;
       varying vec2 vUv;
       varying vec3 vWorld;
+      varying vec3 vNormalW;
       #include <fog_pars_fragment>
       ${NOISE_GLSL}
       void main() {
@@ -66,8 +93,48 @@ export function makeBuildingMaterial(wallColor, inkColor, lineStrength) {
         float line = 1.0 - smoothstep(0.015 + jit, 0.055 + jit, e);
         float halo = 1.0 - smoothstep(0.04 + jit, 0.20 + jit, e);
         vec3 col = uWall;
-        col *= 0.94 + 0.06 * vUv.y;                     // 微弱上下渐变，避免死白
-        col += (fbm(vec2(vWorld.x * 0.05, vWorld.z * 0.05)) - 0.5) * 0.04; // 纸面污渍感
+
+        // M10 宣纸颗粒：世界坐标采样，跨面连续不重缝
+        float grain = texture2D(uGrain, vWorld.xz * 0.09).r;
+        col *= 0.90 + grain * 0.14;
+
+        // M10 门窗暗示（仅立面，屋面不画）：格扇窗 + 双扇门，fwidth 抗锯齿
+        float verticalFace = 1.0 - step(0.5, abs(vNormalW.y));
+        if (uTile < 0.5 && verticalFace > 0.5) {
+          vec2 fw = vec2(fwidth(vUv.x), fwidth(vUv.y));
+          // 窗洞区域（中上）
+          float wx0 = 0.30, wx1 = 0.70, wy0 = 0.40, wy1 = 0.78;
+          float inWin = step(wx0, vUv.x) * step(vUv.x, wx1) * step(wy0, vUv.y) * step(vUv.y, wy1);
+          // 窗洞内底色：微暗
+          col = mix(col, uInk, inWin * 0.18);
+          // 窗框：四周描边
+          float fx = min(vUv.x - wx0, wx1 - vUv.x);
+          float fy = min(vUv.y - wy0, wy1 - vUv.y);
+          float frame = (1.0 - smoothstep(0.018, 0.018 + fw.x * 2.0, min(fx, fy))) * inWin;
+          col = mix(col, uInk, frame * 0.55);
+          // 格扇：竖向格栅 4 根 + 横向 1 根
+          float gx = abs(fract((vUv.x - wx0) / (wx1 - wx0) * 5.0 + 0.5) - 0.5) * (wx1 - wx0) / 5.0;
+          float latV = (1.0 - smoothstep(0.014, 0.014 + fw.x * 2.0, gx)) * inWin;
+          col = mix(col, uInk, latV * 0.38);
+          float gy = abs(vUv.y - (wy0 + wy1) * 0.5);
+          float latH = (1.0 - smoothstep(0.014, 0.014 + fw.y * 2.0, gy)) * inWin;
+          col = mix(col, uInk, latH * 0.38);
+          // 门：底部中央双扇门 + 中缝亮线 + 门框
+          float dx0 = 0.40, dx1 = 0.60, dy1 = 0.30;
+          float inDoor = step(dx0, vUv.x) * step(vUv.x, dx1) * step(0.0, vUv.y) * step(vUv.y, dy1);
+          col = mix(col, uInk, inDoor * 0.40);
+          float mid = (1.0 - smoothstep(0.006, 0.006 + fw.x * 2.0, abs(vUv.x - 0.5))) * inDoor;
+          col = mix(col, uWall, mid * 0.5);
+          float dfx = min(vUv.x - dx0, dx1 - vUv.x);
+          float dframe = (1.0 - smoothstep(0.012, 0.012 + fw.x * 2.0, min(dfx, dy1 - vUv.y))) * inDoor;
+          col = mix(col, uInk, dframe * 0.5);
+        }
+
+        // M10 屋顶瓦线：沿坡向等距细线（约 15% 透明度）
+        float tl = abs(fract(vUv.x * 14.0) - 0.5) * 2.0;
+        float tileLine = smoothstep(0.86, 1.0, tl) * 0.15 * uTile;
+        col = mix(col, uInk, tileLine);
+
         col = mix(col, uInk, halo * 0.15 * uLineK);
         col = mix(col, uInk, line * uLineK);
         // 浮现边缘的湿墨
@@ -383,14 +450,35 @@ export function buildBuildings(streets, waterData, exclusions = []) {
   roofGeos.forEach((g) => g.dispose());
 
   const wallMat = makeBuildingMaterial(0xf3efe4, 0x55503f, 1.0);
-  const roofMat = makeBuildingMaterial(0xd8cfba, 0x55503f, 1.15);
+  const roofMat = makeBuildingMaterial(0xd8cfba, 0x55503f, 1.15, true);
   const walls = new THREE.Mesh(wallMerged, wallMat);
   const roofs = new THREE.Mesh(roofMerged, roofMat);
   walls.renderOrder = 2;
   roofs.renderOrder = 2;
 
+  // M10 接地阴影：每栋建筑脚下深墨椭圆，合并为单一 Mesh（1 次 draw call）
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x3a352b, transparent: true, opacity: 0.4, depthWrite: false,
+  });
+  const shadowCircle = new THREE.CircleGeometry(1, 18).rotateX(-Math.PI / 2);
+  const shadowGeos = [];
+  for (const u of units) {
+    let ex = 0, ez = 0;
+    for (const b of u.proto.boxes) {
+      ex = Math.max(ex, Math.abs(b.x) + (b.w * u.scale) / 2);
+      ez = Math.max(ez, Math.abs(b.z) + (b.d * u.scale) / 2);
+    }
+    const g = shadowCircle.clone();
+    g.scale(ex * 1.12, 1, ez * 1.12);
+    const m = new THREE.Matrix4().makeRotationY(u.rot).setPosition(u.x, 0.28, u.z);
+    g.applyMatrix4(m);
+    shadowGeos.push(g);
+  }
+  const shadowMesh = new THREE.Mesh(mergeGeometries(shadowGeos), shadowMat);
+  shadowMesh.renderOrder = 1;
+
   const group = new THREE.Group();
-  group.add(walls, roofs);
-  const materials = [wallMat, roofMat];
+  group.add(walls, roofs, shadowMesh);
+  const materials = [wallMat, roofMat, shadowMat];
   return { group, materials, units: units.length };
 }

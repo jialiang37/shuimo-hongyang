@@ -127,9 +127,11 @@ window.__setView = setView; // 浏览器控制台可随时切换
 const revealAnims = []; // {mat, start, dur, mode}
 function addReveal(mats, start, dur, mode = 'u') {
   for (const m of mats) {
-    if (mode === 'u') m.uniforms.uReveal.value = 0;
+    // 无 uReveal uniform 的材质（如接地阴影）自动降级为透明度渐显
+    const realMode = mode === 'u' && !(m.uniforms && m.uniforms.uReveal) ? 'opacity' : mode;
+    if (realMode === 'u') m.uniforms.uReveal.value = 0;
     else m.opacity = 0;
-    revealAnims.push({ mat: m, start, dur, mode });
+    revealAnims.push({ mat: m, start, dur, mode: realMode });
   }
 }
 
@@ -226,8 +228,13 @@ loadStreets()
       addReveal(nature.clouds.map((s) => s.material), t0 + 11.0, 2.5, 'opacity');
       addReveal([nature.title.material], t0 + 13.0, 2.0, 'opacity');
       addReveal(lm.plates.map((s) => s.material), t0 + 13.5, 2.0, 'opacity');
-      intro.active = true;
-      intro.t0 = t0;
+      if (playIntro) {
+        intro.active = true;
+        intro.t0 = t0;
+        controls.enabled = false;
+      } else {
+        endIntro(); // 带 cam/view 参数时跳过开场：所有元素直接可见
+      }
     }).catch((e) => {
       window.__chainErr = String(e && e.stack ? e.stack.split('\n').slice(0, 4).join(' | ') : e);
       showLoadError('建筑/地标构建失败，请刷新重试');

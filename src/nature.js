@@ -127,6 +127,8 @@ export function buildNature(streets, waterData, landmarks, opts = {}) {
   // ---- 水墨树撒点 ----
   const texs = [treeTexture(11, 0), treeTexture(22, 1), treeTexture(33, 2)];
   const geos = [[], [], []];
+  const shadowGeos = [];
+  const shadowCircle = new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2);
   const plant = (x, z, s = 1) => {
     if (opts.mobile && rand() < 0.5) return; // 移动端树减半
     const vi = Math.floor(rand() * 3);
@@ -134,6 +136,12 @@ export function buildNature(streets, waterData, landmarks, opts = {}) {
     g.rotateY(rand() * Math.PI * 2);
     g.translate(x, 9.2 * s, z);
     geos[vi].push(g);
+    // M10 接地阴影
+    const sh = shadowCircle.clone();
+    sh.scale(4.5 * s, 1, 3.2 * s);
+    sh.rotateY(rand() * Math.PI);
+    sh.translate(x, 0.16, z);
+    shadowGeos.push(sh);
   };
 
   // 净空：道路半宽+3、水系半宽内不种
@@ -232,6 +240,16 @@ export function buildNature(streets, waterData, landmarks, opts = {}) {
     mesh.renderOrder = 3;
     group.add(mesh);
   });
+  // 树影合并
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x3a352b, transparent: true, opacity: 0.32, depthWrite: false,
+  });
+  if (shadowGeos.length) {
+    const shadowMesh = new THREE.Mesh(mergeGeometries(shadowGeos), shadowMat);
+    shadowMesh.renderOrder = 1;
+    group.add(shadowMesh);
+    treeMats.push(shadowMat);
+  }
 
   // ---- 远景淡墨云雾（缓慢环绕漂移） ----
   const cloudTex = cloudTexture();

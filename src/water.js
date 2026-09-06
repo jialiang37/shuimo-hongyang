@@ -95,7 +95,7 @@ export function makeWaterMaterial() {
 
 // 沿中心线把宽度 width 的条带铺成网格；uv.x=横跨(0~1)，uv.y=沿程累计米数
 // y 抬高到 4m：远离地面（y=0）以避开远距离深度缓冲精度导致的 Z 冲突
-export function ribbonGeometry(points, width, y = 4, closed = false) {
+export function ribbonGeometry(points, width, y = 4, closed = false, main = false) {
   // 去除相邻过近点：零长度段会让 CatmullRom 切线翻转，条带会捏出"裂口"
   // 点格式兼容 {x,z} 对象（水系数据）与 [x,z] 数组（街巷数据）
   const pts = [];
@@ -112,11 +112,13 @@ export function ribbonGeometry(points, width, y = 4, closed = false) {
   const SEGS = 400;
   const positions = [];
   const uvs = [];
+  const aMains = [];
   const indices = [];
   const up = new THREE.Vector3(0, 1, 0);
   const side = new THREE.Vector3();
   let acc = 0;
   let prev = curve.getPointAt(0);
+  const mFlag = main ? 1 : 0;
   for (let i = 0; i <= SEGS; i++) {
     const t = i / SEGS;
     const P = curve.getPointAt(t);
@@ -128,6 +130,7 @@ export function ribbonGeometry(points, width, y = 4, closed = false) {
     if (i > 0) acc += P.distanceTo(prev);
     prev = P.clone();
     uvs.push(0, acc, 1, acc);
+    aMains.push(mFlag, mFlag);
     if (i < SEGS) {
       const a = i * 2;
       indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
@@ -136,6 +139,7 @@ export function ribbonGeometry(points, width, y = 4, closed = false) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setAttribute('aMain', new THREE.Float32BufferAttribute(aMains, 1));
   g.setIndex(indices);
   return g;
 }
