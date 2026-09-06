@@ -11,7 +11,12 @@
         margin: 0;
         height: 100%;
         overflow: hidden;
-        background: #f5f1e6;
+      }
+      /* 宣纸铺满页面底层，WebGL 画布透明叠在上面；
+        M1 的宣纸纹理是程序化生成的，之后可用 AI 生图的 T_Paper.png 直接替换 */
+      body {
+        background: #f2eddf url("/assets/textures/T_Paper.png") repeat;
+        background-size: 512px 512px;
       }
       #scene {
         display: block;
@@ -34,7 +39,7 @@
   </head>
   <body>
     <canvas id="scene"></canvas>
-    <div id="hint">水墨洪阳 · M0 —— 拖动旋转 · 滚轮缩放</div>
+    <div id="hint">水墨洪阳 · M1 —— 宣纸与雾</div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
