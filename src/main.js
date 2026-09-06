@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildWater } from './water.js';
 import { loadStreets, buildRoads } from './roads.js';
+import { buildBuildings } from './buildings.js';
 
 // ---- 渲染器（透明底） ----
 const canvas = document.querySelector('#scene');
@@ -13,9 +14,11 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true 
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000, 0);
+window.__renderer = renderer; // 验收期临时暴露
 
 // ---- 场景与雾 ----
 const scene = new THREE.Scene();
+window.__scene = scene; // 验收期临时暴露
 const PAPER_TONE = 0xf2eddf; // 宣纸纹理平均色（tools/generate-paper-texture.mjs 输出）
 scene.fog = new THREE.FogExp2(PAPER_TONE, 0.0033); // 初始浓度≈贴地可视300m，主循环中按相机距离自适应
 
@@ -28,6 +31,7 @@ const camera = new THREE.PerspectiveCamera(
   4000
 );
 const controls = new OrbitControls(camera, canvas);
+window.__camera = camera; // 验收期临时暴露
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI / 2 - 0.02;
@@ -77,24 +81,38 @@ scene.add(ground);
 
 // ---- 水系：读取实测数据文件构建 ----
 const waterMaterials = [];
-fetch('/assets/data/hongyang-water.json')
-  .then((r) => {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  })
-  .then((data) => {
-    const { group, materials } = buildWater(data);
-    waterMaterials.push(...materials);
-    scene.add(group);
-  });
-
-// ---- 街巷：优先手描 GeoJSON，否则写意格局（洪阳老城十字街） ----
-const roadMaterials = [];
-loadStreets().then((streets) => {
-  const { group, materials } = buildRoads(streets);
-  roadMaterials.push(...materials);
+const waterLoad = fetch('/assets/data/hongyang-water.json').then((r) => {
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+});
+waterLoad.then((data) => {
+  const { group, materials } = buildWater(data);
+  waterMaterials.push(...materials);
   scene.add(group);
 });
+
+// ---- 街巷：优先手描 GeoJSON，否则写意格局（洪阳老城十字街） ----
+// ---- 建筑：沿街排布的潮汕民居群（依赖街巷与水系数据做净距检查） ----
+const roadMaterials = [];
+const buildingMaterials = [];
+loadStreets()
+  .then((streets) => {
+    const { group, materials } = buildRoads(streets);
+    roadMaterials.push(...materials);
+    scene.add(group);
+
+    return waterLoad.then((waterData) => {
+      const { group: bg, materials: bm, units } = buildBuildings(streets, waterData);
+      buildingMaterials.push(...bm);
+      scene.add(bg);
+      window.__build = { units };
+    }).catch((e) => {
+      window.__build = { error: String(e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e) };
+    });
+  })
+  .catch((e) => {
+    console.error('街巷/建筑构建失败:', e);
+  });
 
 // ---- 主循环 ----
 const clock = new THREE.Clock();
